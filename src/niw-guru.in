@@ -33,7 +33,8 @@ set -euo pipefail
 #   any time with the NIW_GURU_HOME environment variable.
 # ---------------------------------------------------------------------------
 NIW_GURU_HOME="${NIW_GURU_HOME:-@NIW_GURU_HOME@}"
-if [[ "$NIW_GURU_HOME" == "@NIW_GURU_HOME@" || ! -d "$NIW_GURU_HOME" ]]; then
+# Keep the sentinel split so the build only substitutes the assignment above.
+if [[ "$NIW_GURU_HOME" == '@NIW_''GURU_HOME@' || ! -d "$NIW_GURU_HOME" ]]; then
   _src="${BASH_SOURCE[0]}"
   while [ -h "$_src" ]; do
     _dir="$(cd -P "$(dirname "$_src")" >/dev/null 2>&1 && pwd)"
@@ -42,7 +43,7 @@ if [[ "$NIW_GURU_HOME" == "@NIW_GURU_HOME@" || ! -d "$NIW_GURU_HOME" ]]; then
   done
   NIW_GURU_HOME="$(cd -P "$(dirname "$_src")/.." >/dev/null 2>&1 && pwd)"
 fi
-PROJECT_ROOT="$NIW_GURU_HOME"
+PROJECT_ROOT="$(cd -P "$NIW_GURU_HOME" >/dev/null 2>&1 && pwd)"
 
 # ---------------------------------------------------------------------------
 # Defaults & arg parsing
@@ -67,7 +68,7 @@ REQUIRED
 
 OPTIONS
   -o, --output <dir>   Where runs are written        (default: <project>/output)
-  -n, --name <name>    Name for this run's subfolder  (default: <src>-<timestamp>)
+  -n, --name <name>    New run subfolder; no slashes  (default: <src>-<timestamp>)
       --yes            Fully unattended: skip all permission prompts
                        (passes --dangerously-skip-permissions to claude).
       --dry-run        Print what would run, then exit. No Claude call.
@@ -89,19 +90,25 @@ then build the command with `make build` (or the manual step in INSTALL.md).
 EOF
 }
 
+err() { echo "niw-guru: $*" >&2; }
+require_value() {
+  if [[ $# -lt 2 || -z "$2" || "$2" == -* ]]; then
+    err "$1 requires a value (prefix paths starting with '-' with ./)"
+    exit 2
+  fi
+}
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    -s|--source) SRC="${2:-}"; shift 2 ;;
-    -o|--output) OUT_DIR="${2:-}"; shift 2 ;;
-    -n|--name)   RUN_NAME="${2:-}"; shift 2 ;;
+    -s|--source) require_value "$@"; SRC="$2"; shift 2 ;;
+    -o|--output) require_value "$@"; OUT_DIR="$2"; shift 2 ;;
+    -n|--name)   require_value "$@"; RUN_NAME="$2"; shift 2 ;;
     --yes|-y)    ASSUME_YES=1; shift ;;
     --dry-run)   DRY_RUN=1; shift ;;
     -h|--help)   usage; exit 0 ;;
     *) echo "niw-guru: unknown argument: $1" >&2; echo "Try 'niw-guru --help'." >&2; exit 2 ;;
   esac
 done
-
-err() { echo "niw-guru: $*" >&2; }
 
 # ---------------------------------------------------------------------------
 # Pre-flight checks
@@ -143,7 +150,31 @@ fi
 if [[ -z "$RUN_NAME" ]]; then
   RUN_NAME="$(basename "$SRC")-$(date +%Y%m%d-%H%M%S)"
 fi
-RUN_DIR="$OUT_DIR/$RUN_NAME"
+if ! command -v python3 >/dev/null 2>&1; then
+  err "python3 is required for safe run-path validation. Install Python 3.8 or later."
+  exit 127
+fi
+RUN_DIR="$(python3 "$PROJECT_ROOT/src/prepare-run.py" -- "$SRC" "$OUT_DIR" "$RUN_NAME")"
+
+# Dry-run needs no installed skills; actual runs fail before creating output.
+if [[ $DRY_RUN -eq 0 ]]; then
+  for required in \
+    .claude/commands/niw-run.md \
+    .claude/skills/document-summary-arrangement/SKILL.md \
+    .claude/skills/document-summary-arrangement/scripts/scan-collection.sh \
+    .claude/skills/niw-national-importance-research/SKILL.md \
+    .claude/skills/niw-federal-evidence-harvester/SKILL.md \
+    .claude/skills/niw-future-endeavors/SKILL.md; do
+    if [[ ! -s "$PROJECT_ROOT/$required" ]]; then
+      err "missing required pipeline file: $required — run ./setup.sh"
+      exit 1
+    fi
+  done
+  if [[ ! -x "$PROJECT_ROOT/.claude/skills/document-summary-arrangement/scripts/scan-collection.sh" ]]; then
+    err "intake scan script is not executable — run ./setup.sh"
+    exit 1
+  fi
+fi
 
 # ---------------------------------------------------------------------------
 # Build the orchestration prompt
@@ -185,7 +216,8 @@ fi
 # ---------------------------------------------------------------------------
 # Create the run dir + env file, then launch Claude Code
 # ---------------------------------------------------------------------------
-mkdir -p "$RUN_DIR/federal_documents"
+# Revalidate and exclusively reserve the run; never reuse an existing directory.
+RUN_DIR="$(python3 "$PROJECT_ROOT/src/prepare-run.py" --create -- "$SRC" "$OUT_DIR" "$RUN_NAME")"
 {
   echo "SOURCE_DIR=$SRC"
   echo "RUN_DIR=$RUN_DIR"

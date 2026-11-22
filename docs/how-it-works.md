@@ -13,12 +13,25 @@ as `NIW_GURU_HOME`. At run time it:
 1. Resolves the project root from the baked `NIW_GURU_HOME` (falling back to its own location, or
    an explicit `NIW_GURU_HOME` env override).
 2. Pre-flight checks: `claude` is installed, the source dir exists and is non-empty, PDF tools present.
-3. Computes the run directory `output/<run-name>/` and writes `.niw-run.env` with the resolved paths.
+3. Uses Python 3.8+ to resolve output paths relative to the invoking directory, reject source/run
+   overlap and invalid names, and reject existing run paths (including dangling symlinks).
+   Required skill files and the executable intake scanner must be installed for actual runs.
+   It reserves a new run directory exclusively and writes `.niw-run.env` with absolute paths.
 4. Invokes `claude -p` from the project root with the orchestrator prompt, adding the source and
    run directories with `--add-dir` so they're reachable.
 5. Prints which deliverables were produced.
 
 ## Permission model
+
+The launcher validates paths before writing, including on dry-runs. Output directories inside
+the source are rejected even through symlink aliases. Run names must be one directory component,
+and existing runs cannot be overwritten or resumed; choose a new name. Safe output-directory
+symlinks are resolved to their physical destination. Dry-runs require Python but neither Claude
+nor installed upstream skills, and create no output.
+
+These checks prevent configuration mistakes and existing symlink escapes. They do not defend
+against another process maliciously changing directories during execution, and do not enforce
+read-only filesystem access for Claude. A separate execution sandbox is needed for that boundary.
 
 A full run uses web search, web fetch, file writes, and shell commands (downloads, PDF tools).
 For that to run unattended, the tools must be pre-approved:

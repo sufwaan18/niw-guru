@@ -18,11 +18,15 @@ just renders a bash script and (optionally) links it onto your PATH — there is
 |---|---|---|
 | **Claude Code** (`claude`) | the engine that runs the pipeline | https://docs.anthropic.com/en/docs/claude-code · `npm i -g @anthropic-ai/claude-code` |
 | **git** | clones the immigration skills during setup | system package manager |
+| **Python 3.8+** (`python3`) | validates paths and reserves new runs, including dry-runs | install Python 3 with your system package manager |
 | **poppler** (`pdftotext`, `pdfinfo`) | extract text and locate quote pages in PDFs | macOS: `brew install poppler` · Debian/Ubuntu: `sudo apt-get install poppler-utils` |
 | **Chrome/Chromium** *or* **wkhtmltopdf** | render HTML sources to PDF (direct PDF links don't need this) | install Chrome, or `brew install --cask wkhtmltopdf` / `sudo apt-get install wkhtmltopdf` |
 | **make** (optional) | one-command build/install | preinstalled on macOS (Xcode CLT) and most Linux |
 
 `./setup.sh` installs poppler and the skills for you and checks for a renderer — see below.
+Install Python separately. Run names must be single directory names and must not already exist.
+Output inside the evidence folder, including through symlinks, is rejected. Choose a new run
+name to retry; automatic resume and overwrite are not supported.
 
 ## Quick path (with make)
 

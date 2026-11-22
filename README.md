@@ -90,7 +90,7 @@ There's **no prebuilt binary** — you build the `niw-guru` command from source 
 script; "building" just renders it and links it onto your PATH). Three steps:
 
 **Requirements:** [Claude Code](https://docs.anthropic.com/en/docs/claude-code) (`claude` on your
-PATH), `git`, `poppler` (PDF tools), and — to capture web pages as PDFs — Google Chrome /
+PATH), Python 3.8+ (`python3`, for path validation), `git`, `poppler` (PDF tools), and — to capture web pages as PDFs — Google Chrome /
 Chromium or `wkhtmltopdf`.
 
 ```bash

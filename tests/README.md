@@ -33,10 +33,12 @@ Skips never fail the suite; only real failures return a non-zero exit code.
 
 ## Known-defect regressions
 
-`test_regressions.py` records four outstanding bugs as `expected failure` results:
+Path safety now has passing regression coverage for overlap, traversal, symlinks, existing
+runs, relative paths, missing arguments, and required pipeline files. Python 3.8+ is also a
+runtime requirement for the launcher's path validation helper.
 
-- Output inside the source folder is not rejected before writing.
-- A run name containing `../` can escape the output root.
+`test_regressions.py` records two outstanding bugs as `expected failure` results:
+
 - A successful model process with missing deliverables still returns success.
 - A quote with an altered ending can return a page based only on its first 12 words.
 
